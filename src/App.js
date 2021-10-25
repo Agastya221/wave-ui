@@ -1,13 +1,20 @@
 import React,{useEffect,useState} from "react";
 import { ethers } from "ethers";
 import abi from './utils/WavePortal.json';
-import './App.css';
-
+import HashLoader from "react-spinners/HashLoader";
+import {FiSend} from "react-icons/fi";
+import LocalizedFormat from "dayjs/plugin/localizedFormat";
+import './App.scss';
+import dayjs from "dayjs";
+dayjs.extend(LocalizedFormat)
 export default function App() {
   const [currentAccount, setCurrentAccount] = useState("");
-  const [wavesCount,setWavesCount]=useState(0);
+  const [message,setMessage]=useState();
+  const [allWaves, setAllWaves] = useState([]);
+  const [loading,setLoading]=useState(false);
+  const [wavesCount,setWavesCount]=useState("??");
   // ETH Contract const
-  const contractAddress="0x3248C1dE344e95191e2Ee6F3c72D17cCAdFd4E9a";
+  const contractAddress="0xAaB513Cb3Aa8cb062D5eb43Ccf52A02CA900cE97";
   const contractABI = abi.abi;
   // End ETH Contract const
   const checkIfWalletIsConnected = async () => {
@@ -62,6 +69,7 @@ export default function App() {
   useEffect(()=> {
     const interval = setInterval(() => {
             retrieveCount();
+            getAllWaves();
         }, 1000);
     return () => clearInterval(interval);
   });
@@ -80,7 +88,8 @@ export default function App() {
      try {
       const { ethereum } = window;
 
-      if (ethereum) {
+      if (ethereum&&message) {
+        setLoading(true);
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
         const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
@@ -91,22 +100,62 @@ export default function App() {
         /*
         * Execute the actual wave from your smart contract
         */
-        const waveTxn = await wavePortalContract.wave();
+        const waveTxn = await wavePortalContract.wave(message);
         console.log("Mining...", waveTxn.hash);
 
         await waveTxn.wait();
         console.log("Mined -- ", waveTxn.hash);
 
-        count = await wavePortalContract.getTotalWaves();
-        console.log("Retrieved total wave count...", count.toNumber());
+        setLoading(false);
       } else {
+        if (ethereum)
+          console.log("Field must not be empty");
+        else
         console.log("Ethereum object doesn't exist!");
       }
     } catch (error) {
       console.log(error)
+      setLoading(false);
     }
   }
-  
+  const getAllWaves = async () => {
+    try {
+      const { ethereum } = window;
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+
+        /*
+         * Call the getAllWaves method from your Smart Contract
+         */
+        const waves = await wavePortalContract.getAllWaves();
+        
+
+        /*
+         * We only need address, timestamp, and message in our UI so let's
+         * pick those out
+         */
+        let wavesCleaned = [];
+        waves.forEach(wave => {
+          wavesCleaned.push({
+            address: wave.waver,
+            timestamp: new Date(wave.timestamp * 1000),
+            message: wave.message
+          });
+        });
+
+        /*
+         * Store our data in React State
+         */
+        setAllWaves(wavesCleaned);
+      } else {
+        console.log("Ethereum object doesn't exist!")
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
   return (
     <div className="mainContainer">
 
@@ -118,18 +167,49 @@ export default function App() {
         <div className="bio">
         I'm <b>Greg</b> and I worked only on <b>Web2</b> websites so getting to <b>Web3</b> is really entertaining right? Connect your Ethereum wallet and wave at me!
         </div>
-
-        <button className="waveButton" onClick={wave}>
-          Wave at Me
+        <div className="card">
+          <div className="card-inner">
+            <label>Send a Wave </label>
+            <div className="container">
+              <div className="input-container">
+                <input 
+                onChange={e=>setMessage(e.target.value)}
+                placeholder="The taughts you want to share"/>
+              </div>
+              <button className="send" onClick={wave}>
+          {loading
+          ?<HashLoader size={20}/>
+          :<FiSend/>
+          }
         </button>
+            </div>
+          </div>
+        </div>
+        
         {!currentAccount && (
           <button className="waveButton" onClick={connectWallet}>
             Connect Wallet
           </button>
         )}
-        <div className="header">
-          {wavesCount} total Waves
+        <div className="totalScore">
+          Total Waves: {wavesCount}
         </div>
+        {allWaves.map((wave, index) => {
+          const timeStamp =new Date(wave.timestamp.toString());
+
+          return (
+            <div key={index} className="card">
+              <div className="card-inner">
+              <div>
+                <span className="addy">
+                  {wave.address}
+                </span>
+                <p>Posted on {dayjs(timeStamp).format('LLL')}</p>
+                <p style={{color:"#ffb86c"}}>{wave.message}</p>
+                </div>
+              </div>
+            </div>)
+        })}
       </div>
     </div>
   );
