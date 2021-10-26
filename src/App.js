@@ -134,7 +134,7 @@ export default function App() {
          */
         let wavesCleaned = [];
         waves.forEach(wave => {
-          wavesCleaned.push({
+          wavesCleaned.unshift({
             address: wave.waver,
             timestamp: new Date(wave.timestamp * 1000),
             message: wave.message,
@@ -157,7 +157,7 @@ export default function App() {
             winner:winner};
             if (allWaves.find((el)=>newWave===el)) {
               console.log(allWaves.find((el)=>newWave.timestamp===el.timestamp));
-              setAllWaves(prevState => [...prevState, newWave]);
+              setAllWaves(prevState => [newWave,...prevState]);
             }
         });
       } else {
